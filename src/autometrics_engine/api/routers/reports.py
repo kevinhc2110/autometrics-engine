@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from autometrics_engine.api.dependencies import get_redis_pool, get_database
 
@@ -22,7 +22,7 @@ async def get_report(report_id: str, db=Depends(get_database)):
         "FROM reports WHERE id = $1", report_id
     )
     if not rows:
-        return {"error": "Report not found"}, 404
+        return JSONResponse(content={"error": "Report not found"}, status_code=404)
     return dict(rows[0])
 
 

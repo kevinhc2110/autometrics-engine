@@ -15,7 +15,7 @@ from autometrics_engine.infrastructure.data.repositories.postgres_sale_repositor
 from autometrics_engine.infrastructure.data.repositories.postgres_kpi_repository import PostgresKpiRepository
 from autometrics_engine.infrastructure.data.repositories.postgres_insight_repository import PostgresInsightRepository
 from autometrics_engine.infrastructure.data.repositories.postgres_report_repository import PostgresReportRepository
-from autometrics_engine.infrastructure.data.repositories.pymssql_extractor import PymssqlExtractor
+
 
 
 # --- LLM singleton ---
@@ -64,6 +64,7 @@ def get_report_repository(db=Depends(get_database)):
 # --- Source extractor ---
 
 def get_source_extractor():
+    from autometrics_engine.infrastructure.data.repositories.pymssql_extractor import PymssqlExtractor
     return PymssqlExtractor(
         host=settings.sqlserver_host,
         port=settings.sqlserver_port,
