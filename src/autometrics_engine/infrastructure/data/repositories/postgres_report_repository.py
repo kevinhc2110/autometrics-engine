@@ -8,8 +8,8 @@ class PostgresReportRepository(ReportRepository):
     def __init__(self, db):
         self.db = db
 
-    async def save(self, title: str, period_start, period_end, summary: str, content: dict):
+    async def save(self, title: str, period_start, period_end, summary: str, content: dict, html_content: str = ""):
         await self.db.execute("""
-            INSERT INTO reports (title, period_start, period_end, summary, content, status, completed_at)
-            VALUES ($1, $2, $3, $4, $5, 'completed', NOW())
-        """, title, period_start, period_end, summary, json.dumps(content, ensure_ascii=False))
+            INSERT INTO reports (title, period_start, period_end, summary, content, html_content, status, completed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, 'completed', NOW())
+        """, title, period_start, period_end, summary, json.dumps(content, ensure_ascii=False), html_content)

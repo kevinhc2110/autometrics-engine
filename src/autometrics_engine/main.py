@@ -11,6 +11,7 @@ from autometrics_engine.api.routers.etl import router as etl_router
 from autometrics_engine.api.routers.kpis import router as kpis_router
 from autometrics_engine.api.routers.insights import router as insights_router
 from autometrics_engine.api.routers.reports import router as reports_router
+from autometrics_engine.api.routers.dashboard import router as dashboard_router
 
 
 @asynccontextmanager
@@ -38,3 +39,4 @@ app.include_router(etl_router)
 app.include_router(kpis_router)
 app.include_router(insights_router)
 app.include_router(reports_router)
+app.include_router(dashboard_router)

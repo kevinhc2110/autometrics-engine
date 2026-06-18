@@ -64,10 +64,12 @@ class GenerateReportUseCase:
         response = await self._llm.generate(prompt, temperature=0.3)
         data = json.loads(response.strip().removeprefix("```json").removesuffix("```").strip())
 
+        html_content = data.pop("html_content", "")
         await self._report_repo.save(
             title=data["title"],
             period_start=period_start,
             period_end=period_end,
             summary=data.get("executive_summary", ""),
             content=data,
+            html_content=html_content,
         )

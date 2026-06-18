@@ -35,6 +35,7 @@ Genera un JSON con esta estructura:
 
 REPORT_PROMPT = """
 Genera un reporte ejecutivo de retail basado en los siguientes datos.
+El reporte debe verse profesional, listo para presentar a la gerencia.
 
 PERÍODO: {period_start} a {period_end}
 
@@ -50,9 +51,12 @@ TOP PRODUCTOS:
 TOP TIENDAS:
 {top_stores}
 
-Genera un JSON con esta estructura:
+Devuelve SOLO un JSON con dos campos: "title" (string), "html_content" (string con HTML INLINE con estilos CSS inline, profesional y listo para incrustar en una página), "executive_summary", "highlights", "concerns", "recommendations", y "sections" (misma estructura de antes).
+
+Estructura exacta:
 {{
     "title": "Reporte automático - {period_start} a {period_end}",
+    "html_content": "<div style='font-family:system-ui,sans-serif;max-width:800px;margin:0 auto;padding:20px;color:#1e293b;'><h2 style='color:#0f172a;border-bottom:3px solid #3b82f6;padding-bottom:8px;'>Resumen Ejecutivo</h2><p>...</p>... todo el HTML con estilos inline aquí ...</div>",
     "executive_summary": "Resumen ejecutivo de 2-3 párrafos",
     "highlights": ["Logro clave 1", "Logro clave 2", "Logro clave 3"],
     "concerns": ["Riesgo 1", "Riesgo 2"],

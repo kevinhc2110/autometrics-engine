@@ -108,6 +108,7 @@ CREATE TABLE reports (
     period_end DATE NOT NULL,
     summary TEXT,
     content JSONB,
+    html_content TEXT,
     status VARCHAR(20) NOT NULL DEFAULT 'draft',
     created_at TIMESTAMPTZ DEFAULT now(),
     completed_at TIMESTAMPTZ,

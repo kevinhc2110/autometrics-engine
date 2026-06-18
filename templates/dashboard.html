@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autometrics Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:system-ui,sans-serif; background:#f1f5f9; color:#1e293b; padding:24px; }
+h1 { font-size:1.5rem; margin-bottom:24px; color:#0f172a; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px; }
+.card { background:#fff; border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+.card .label { font-size:.8rem; color:#64748b; text-transform:uppercase; letter-spacing:.05em; }
+.card .value { font-size:1.5rem; font-weight:700; margin-top:4px; }
+.card .change { font-size:.8rem; margin-top:4px; }
+.up { color:#16a34a; } .down { color:#dc2626; }
+.charts { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+.chart-box { background:#fff; border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+.chart-box h2 { font-size:1rem; margin-bottom:12px; color:#334155; }
+.chart-box.full { grid-column:1/-1; }
+.bars { display:flex; flex-direction:column; gap:8px; }
+.bar-row { display:flex; align-items:center; gap:8px; }
+.bar-row .name { width:140px; font-size:.85rem; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bar-row .bar-bg { flex:1; height:24px; background:#e2e8f0; border-radius:6px; overflow:hidden; }
+.bar-row .bar-fill { height:100%; background:#3b82f6; border-radius:6px; transition:width .5s; }
+.bar-row .val { width:100px; font-size:.85rem; font-weight:600; }
+.actions { display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap; }
+.actions button { padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-weight:600; }
+.btn-blue { background:#3b82f6; color:#fff; } .btn-blue:hover { background:#2563eb; }
+.btn-green { background:#16a34a; color:#fff; } .btn-green:hover { background:#15803d; }
+.btn-amber { background:#d97706; color:#fff; } .btn-amber:hover { background:#b45309; }
+.btn-outline { background:transparent; color:#3b82f6; border:2px solid #3b82f6; }
+.btn-outline:hover { background:#3b82f6; color:#fff; }
+.insights { background:#fff; border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.1); margin-bottom:24px; }
+.insights h2 { font-size:1rem; margin-bottom:12px; color:#334155; }
+.insight-item { padding:12px 0; border-bottom:1px solid #f1f5f9; }
+.insight-item:last-child { border:none; }
+.insight-item .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:.7rem; font-weight:600; text-transform:uppercase; }
+.badge-critical { background:#7f1d1d; color:#fca5a5; }
+.badge-high { background:#fef2f2; color:#dc2626; }
+.badge-medium { background:#fffbeb; color:#d97706; }
+.badge-low { background:#f0fdf4; color:#16a34a; }
+.insight-item h3 { font-size:.9rem; margin:4px 0; }
+.insight-item p { font-size:.8rem; color:#64748b; }
+</style>
+</head>
+<body>
+<h1>Autometrics Dashboard
+  <span id="report-link" style="font-size:.85rem;font-weight:400;margin-left:auto;"></span>
+</h1>
+
+<div class="actions">
+<button class="btn-blue" onclick="fetch('/api/etl/run',{method:'POST'}).then(r=>r.json()).then(console.log)"> ETL</button>
+<button class="btn-green" onclick="fetch('/api/insights/generate',{method:'POST'}).then(r=>r.json()).then(()=>loadData())"> Insights</button>
+<button class="btn-amber" onclick="fetch('/api/reports/generate',{method:'POST'}).then(r=>r.json()).then(()=>loadData())"> Reporte</button>
+</div>
+
+<div id="cards" class="cards"><p style="color:#64748b">Cargando...</p></div>
+
+<div class="charts">
+  <div class="chart-box full"><h2>Tendencia (30 días)</h2><canvas id="trend-chart"></canvas></div>
+  <div class="chart-box"><h2>Top Productos</h2><div id="products-chart" class="bars"></div></div>
+  <div class="chart-box"><h2>Top Tiendas</h2><div id="stores-chart" class="bars"></div></div>
+</div>
+
+<div class="insights">
+  <h2>Insights</h2>
+  <div id="insights-list"></div>
+</div>
+
+<script>
+const COLORS = ['#3b82f6','#16a34a','#d97706','#8b5cf6','#ec4899','#06b6d4','#f43f5e'];
+let trendChart = null;
+
+function fmtKpi(unit, val) {
+  if (unit === 'COP') return '$' + Number(val).toLocaleString('es-CO',{maximumFractionDigits:0});
+  if (unit === '%') return Number(val).toFixed(1) + '%';
+  return Number(val).toLocaleString();
+}
+
+async function loadData() {
+  const res = await fetch('/api/dashboard/data');
+  const d = await res.json();
+  renderCards(d.kpi_definitions, d.latest);
+  renderTrend(d.kpi_definitions, d.trends);
+  renderBars('products-chart', d.top_products, 'units');
+  renderBars('stores-chart', d.top_stores, 'cop');
+  renderInsights(d.insights);
+  renderReportLink(d.last_report);
+}
+
+function renderCards(defs, latest) {
+  const html = defs.map(def => {
+    const d = latest[def.name] || {};
+    const v = fmtKpi(def.unit, d.value ?? 0);
+    const ch = d.change;
+    const cls = ch > 0 ? 'up' : ch < 0 ? 'down' : '';
+    const arrow = ch > 0 ? '▲' : ch < 0 ? '▼' : '—';
+    return `<div class="card"><div class="label">${def.description || def.name}</div><div class="value">${v}</div><div class="change ${cls}">${arrow} ${ch != null ? ch.toFixed(1)+'%' : '—'}</div></div>`;
+  }).join('');
+  document.getElementById('cards').innerHTML = html;
+}
+
+function renderTrend(defs, trends) {
+  const labels = Object.values(trends)[0]?.map(p => p.date) || [];
+  const datasets = [];
+  let ci = 0;
+  for (const [name, pts] of Object.entries(trends)) {
+    const def = defs.find(d => d.name === name);
+    if (!def) continue;
+    datasets.push({
+      label: def.description || name,
+      data: pts.map(p => p.value),
+      borderColor: COLORS[ci % COLORS.length],
+      tension: 0.3, fill: false,
+    });
+    ci++;
+  }
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trend-chart'), {
+    type:'line',
+    data:{ labels, datasets },
+    options:{ responsive:true, plugins:{ legend:{ position:'top' } }, scales:{ y:{ beginAtZero:false } } }
+  });
+}
+
+function renderBars(id, items, unit) {
+  const max = Math.max(...items.map(i=>i.total), 1);
+  document.getElementById(id).innerHTML = items.map(i =>
+    `<div class="bar-row"><span class="name">${i.name}</span><div class="bar-bg"><div class="bar-fill" style="width:${(i.total/max*100).toFixed(1)}%"></div></div><span class="val">${unit==='cop' ? '$'+Number(i.total).toLocaleString('es-CO',{maximumFractionDigits:0}) : Number(i.total).toLocaleString()}</span></div>`
+  ).join('');
+}
+
+function renderInsights(insights) {
+  document.getElementById('insights-list').innerHTML = insights.length
+    ? insights.map(i => `<div class="insight-item"><span class="badge badge-${i.severity}">${i.category} / ${i.severity}</span><h3>${i.title}</h3><p>${i.summary}</p></div>`).join('')
+    : '<p style="color:#64748b">Sin insights a&uacute;n. Genera uno.</p>';
+}
+
+function renderReportLink(r) {
+  const el = document.getElementById('report-link');
+  if (r) {
+    el.innerHTML = `<a href="/api/reports/${r.id}/html" style="color:#3b82f6;">Ver &uacute;ltimo reporte &rarr;</a>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>
