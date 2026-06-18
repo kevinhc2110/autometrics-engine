@@ -1,0 +1,110 @@
+services:
+  sqlserver:
+    build: ./db/sqlserver
+    container_name: autometrics-sqlserver
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_SA_PASSWORD: ${sqlserver_sa_password}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${sqlserver_sa_password} -C -Q 'SELECT 1' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  db:
+    build: ./db
+    container_name: autometrics-db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${postgres_user}
+      POSTGRES_PASSWORD: ${postgres_password}
+      POSTGRES_DB: ${postgres_db}
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${postgres_user} -d ${postgres_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: autometrics-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    container_name: autometrics-app
+
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+
+    ports:
+      - "8000:8000"
+
+    env_file: .env
+
+    environment:
+      redis_url: redis://redis:6379/0
+
+    volumes:
+      - .:/app
+
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: autometrics-worker
+
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+
+    env_file: .env
+
+    environment:
+      redis_url: redis://redis:6379/0
+
+    volumes:
+      - .:/app
+
+    command: [
+      "arq",
+      "autometrics_engine.infrastructure.worker.settings.WorkerSettings"
+    ]
+
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  sqlserver_data:
