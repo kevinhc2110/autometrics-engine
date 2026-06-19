@@ -6,12 +6,16 @@ from autometrics_engine.infrastructure.worker.functions import (
     run_etl_pipeline,
     generate_insights,
     generate_report,
+    startup,
+    shutdown,
 )
 
 
 class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     functions = [run_etl_pipeline, generate_insights, generate_report]
+    on_startup = startup
+    on_shutdown = shutdown
     cron_jobs = [
         cron(run_etl_pipeline, hour=6, minute=0),
         cron(generate_insights, weekday="sun", hour=6, minute=30),

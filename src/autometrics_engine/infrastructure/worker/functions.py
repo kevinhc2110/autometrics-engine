@@ -18,10 +18,19 @@ from autometrics_engine.infrastructure.data.repositories.pymssql_extractor impor
 POSTGRES_DSN = settings.postgres_dsn
 
 
-async def _get_use_cases():
+async def startup(ctx):
     db = PostgresDatabase(dsn=POSTGRES_DSN)
     await db.connect()
+    ctx['db'] = db
 
+
+async def shutdown(ctx):
+    db = ctx.get('db')
+    if db:
+        await db.disconnect()
+
+
+async def _build_use_cases(db):
     product_repo = PostgresProductRepository(db)
     store_repo = PostgresStoreRepository(db)
     sale_repo = PostgresSaleRepository(db)
@@ -60,28 +69,19 @@ async def _get_use_cases():
         sale_repo=sale_repo,
         llm=llm,
     )
-    return db, etl, insights, report
+    return etl, insights, report
 
 
 async def run_etl_pipeline(ctx):
-    db, etl, _, _ = await _get_use_cases()
-    try:
-        await etl.execute()
-    finally:
-        await db.disconnect()
+    etl, _, _ = await _build_use_cases(ctx['db'])
+    await etl.execute()
 
 
 async def generate_insights(ctx):
-    db, _, insights, _ = await _get_use_cases()
-    try:
-        await insights.execute()
-    finally:
-        await db.disconnect()
+    _, insights, _ = await _build_use_cases(ctx['db'])
+    await insights.execute()
 
 
 async def generate_report(ctx):
-    db, _, _, report = await _get_use_cases()
-    try:
-        await report.execute()
-    finally:
-        await db.disconnect()
+    _, _, report = await _build_use_cases(ctx['db'])
+    await report.execute()
